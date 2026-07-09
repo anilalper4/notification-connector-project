@@ -1,122 +1,110 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState } from "react";
+import "./App.css";
+
+type NotificationItem = {
+  id: string;
+  source: string;
+  type: string;
+  message: string;
+  occurredAt: string;
+  receivedAt: string;
+  deduplicationKey: string;
+};
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [status, setStatus] = useState("Henüz veri çekilmedi.");
+
+  async function loadNotifications() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/notifications`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = (await response.json()) as NotificationItem[];
+
+      setNotifications(data);
+      setStatus(`Son güncelleme: ${new Date().toLocaleTimeString("tr-TR")}`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Bilinmeyen hata";
+      setStatus(`Backend'e bağlanılamadı: ${message}`);
+    }
+  }
+
+  useEffect(() => {
+    const initialLoadId = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
+
+    const intervalId = window.setInterval(() => {
+      void loadNotifications();
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(initialLoadId);
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <main className="page">
+      <section className="hero">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+          <p className="eyebrow">1. Hafta İnce Hat</p>
+          <h1>Canlı Bildirim Listesi</h1>
+          <p className="description">
+            Simulator tarafından üretilen mesajlar backend'e gider ve bu ekranda
+            otomatik olarak listelenir.
           </p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+
+        <button onClick={loadNotifications}>Manuel Yenile</button>
       </section>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
+      <section className="status-card">
+        <strong>Durum:</strong> {status}
       </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <section className="list">
+        {notifications.length === 0 ? (
+          <div className="empty-state">
+            Henüz bildirim yok. Backend ve simulator çalışıyorsa birkaç saniye
+            içinde burada mesaj görünecek.
+          </div>
+        ) : (
+          notifications.map((notification) => (
+            <article className="notification-card" key={notification.id}>
+              <div className="card-header">
+                <span className="badge">{notification.source}</span>
+                <span className="type">{notification.type}</span>
+              </div>
+
+              <p className="message">{notification.message}</p>
+
+              <div className="meta">
+                <span>
+                  Oluşma:{" "}
+                  {new Date(notification.occurredAt).toLocaleString("tr-TR")}
+                </span>
+                <span>
+                  Alınma:{" "}
+                  {new Date(notification.receivedAt).toLocaleString("tr-TR")}
+                </span>
+              </div>
+
+              <code>{notification.deduplicationKey}</code>
+            </article>
+          ))
+        )}
+      </section>
+    </main>
+  );
 }
 
-export default App
+export default App;
