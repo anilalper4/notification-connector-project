@@ -9,14 +9,33 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - PORT=8080
 
+  connector:
+    build:
+      context: ./connector
+    container_name: notification-connector
+    ports:
+      - "8090:8090"
+    depends_on:
+      - backend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - PORT=8090
+      - BACKEND_URL=http://backend:8080
+      - CONNECTOR_SOURCES=webhook,websocket
+      - WEBSOCKET_SOURCE_URL=ws://simulator:7001/ws
+
   simulator:
     build:
       context: ./simulator
     container_name: notification-simulator
+    ports:
+      - "7001:7001"
     depends_on:
-      - backend
+      - connector
     environment:
-      - BACKEND_URL=http://backend:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+      - PORT=7001
+      - CONNECTOR_WEBHOOK_URL=http://connector:8090/webhook
 
   frontend:
     build:
