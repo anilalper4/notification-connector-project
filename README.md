@@ -15,3 +15,41 @@ Backend
   ↓ HTTP GET
 Frontend
 ```
+
+## 2. Hafta Kapsamı
+
+İkinci hafta kapsamında connector çekirdeği ve iki farklı adapter geliştirildi:
+
+- Connector core yapısı oluşturuldu.
+- `IConnector` ve `ISourceAdapter` sözleşmeleri eklendi.
+- Kaynakların `Register` / `Unregister` mantığıyla connector çekirdeğine bağlanması sağlandı.
+- Webhook adapter geliştirildi.
+- WebSocket adapter geliştirildi.
+- Gelen ham mesajların ortak `NotificationEnvelope` formatına normalize edilmesi sağlandı.
+- Connector'ın normalize edilen mesajları backend'e göndermesi sağlandı.
+- Simulator Webhook ve WebSocket kaynakları üretecek şekilde güncellendi.
+- Docker Compose akışına connector servisi eklendi.
+
+2. hafta sonunda çalışan akış:
+
+```txt
+Simulator Webhook Sender
+        ↓
+Connector Webhook Adapter
+        ↓
+Connector Core
+        ↓
+Backend
+        ↓
+Frontend
+
+Simulator WebSocket Server
+        ↓
+Connector WebSocket Adapter
+        ↓
+Connector Core
+        ↓
+Backend
+        ↓
+Frontend
+```
