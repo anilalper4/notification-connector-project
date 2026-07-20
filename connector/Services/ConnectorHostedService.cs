@@ -8,6 +8,8 @@ public class ConnectorHostedService : BackgroundService
     private readonly IConnector _connector;
     private readonly WebhookSourceAdapter _webhookSourceAdapter;
     private readonly WebSocketSourceAdapter _webSocketSourceAdapter;
+    private readonly RabbitMqSourceAdapter _rabbitMqSourceAdapter;
+    private readonly RedisSourceAdapter _redisSourceAdapter;
     private readonly BackendNotificationClient _backendNotificationClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ConnectorHostedService> _logger;
@@ -16,6 +18,8 @@ public class ConnectorHostedService : BackgroundService
         IConnector connector,
         WebhookSourceAdapter webhookSourceAdapter,
         WebSocketSourceAdapter webSocketSourceAdapter,
+        RabbitMqSourceAdapter rabbitMqSourceAdapter,
+        RedisSourceAdapter redisSourceAdapter,
         BackendNotificationClient backendNotificationClient,
         IConfiguration configuration,
         ILogger<ConnectorHostedService> logger
@@ -24,6 +28,8 @@ public class ConnectorHostedService : BackgroundService
         _connector = connector;
         _webhookSourceAdapter = webhookSourceAdapter;
         _webSocketSourceAdapter = webSocketSourceAdapter;
+        _rabbitMqSourceAdapter = rabbitMqSourceAdapter;
+        _redisSourceAdapter = redisSourceAdapter;
         _backendNotificationClient = backendNotificationClient;
         _configuration = configuration;
         _logger = logger;
@@ -46,6 +52,16 @@ public class ConnectorHostedService : BackgroundService
         if (enabledSources.Contains("websocket"))
         {
             _connector.Register(_webSocketSourceAdapter);
+        }
+
+        if (enabledSources.Contains("rabbitmq"))
+        {
+            _connector.Register(_rabbitMqSourceAdapter);
+        }
+
+        if (enabledSources.Contains("redis"))
+        {
+            _connector.Register(_redisSourceAdapter);
         }
 
         await _connector.StartAsync(stoppingToken);
@@ -74,7 +90,7 @@ public class ConnectorHostedService : BackgroundService
     private HashSet<string> GetEnabledSources()
     {
         var rawSources = _configuration["CONNECTOR_SOURCES"]
-            ?? "webhook,websocket";
+            ?? "webhook,websocket,rabbitmq,redis";
 
         return rawSources
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
