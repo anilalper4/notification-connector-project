@@ -6,6 +6,8 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using RabbitMQ.Client;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,18 @@ var connectorWebhookUrl = Environment.GetEnvironmentVariable("CONNECTOR_WEBHOOK_
 
 var simulatorPort = Environment.GetEnvironmentVariable("PORT") ?? "7001";
 
+var rabbitMqUri = Environment.GetEnvironmentVariable("RABBITMQ_URI")
+    ?? "amqp://guest:guest@localhost:5672";
+
+var rabbitMqQueue = Environment.GetEnvironmentVariable("RABBITMQ_QUEUE")
+    ?? "notifications.rabbitmq";
+
+var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING")
+    ?? "localhost:6379";
+
+var redisChannel = Environment.GetEnvironmentVariable("REDIS_CHANNEL")
+    ?? "notifications.redis";
+
 app.Urls.Add($"http://0.0.0.0:{simulatorPort}");
 
 app.UseWebSockets();
@@ -29,7 +43,11 @@ app.MapGet("/", () =>
         status = "Simulator is running",
         service = "notification-simulator",
         websocketEndpoint = "/ws",
-        connectorWebhookUrl
+        connectorWebhookUrl,
+        rabbitMqUri,
+        rabbitMqQueue,
+        redisConnectionString,
+        redisChannel
     });
 });
 
@@ -97,6 +115,10 @@ _ = Task.Run(async () =>
     await ProduceMessagesAsync(
         connectedWebSocketClients,
         connectorWebhookUrl,
+        rabbitMqUri,
+        rabbitMqQueue,
+        redisConnectionString,
+        redisChannel,
         app.Lifetime.ApplicationStopping
     );
 });
@@ -104,12 +126,20 @@ _ = Task.Run(async () =>
 Console.WriteLine("Simulator started.");
 Console.WriteLine($"WebSocket URL: ws://localhost:{simulatorPort}/ws");
 Console.WriteLine($"Connector webhook URL: {connectorWebhookUrl}");
+Console.WriteLine($"RabbitMQ URI: {rabbitMqUri}");
+Console.WriteLine($"RabbitMQ queue: {rabbitMqQueue}");
+Console.WriteLine($"Redis connection: {redisConnectionString}");
+Console.WriteLine($"Redis channel: {redisChannel}");
 
 await app.RunAsync();
 
 static async Task ProduceMessagesAsync(
     ConcurrentDictionary<Guid, WebSocket> connectedWebSocketClients,
     string connectorWebhookUrl,
+    string rabbitMqUri,
+    string rabbitMqQueue,
+    string redisConnectionString,
+    string redisChannel,
     CancellationToken cancellationToken
 )
 {
@@ -128,13 +158,14 @@ static async Task ProduceMessagesAsync(
     while (!cancellationToken.IsCancellationRequested)
     {
         var eventType = eventTypes[counter % eventTypes.Length];
+        var occurredAt = DateTimeOffset.UtcNow;
 
         var webhookNotification = new
         {
             source = "simulator-webhook",
             type = eventType,
             message = $"Webhook notification #{counter} - {eventType}",
-            occurredAt = DateTimeOffset.UtcNow,
+            occurredAt,
             deduplicationKey = $"simulator-webhook-{counter}"
         };
 
@@ -143,8 +174,26 @@ static async Task ProduceMessagesAsync(
             source = "simulator-websocket",
             type = eventType,
             message = $"WebSocket notification #{counter} - {eventType}",
-            occurredAt = DateTimeOffset.UtcNow,
+            occurredAt,
             deduplicationKey = $"simulator-websocket-{counter}"
+        };
+
+        var rabbitMqNotification = new
+        {
+            source = "simulator-rabbitmq",
+            type = eventType,
+            message = $"RabbitMQ notification #{counter} - {eventType}",
+            occurredAt,
+            deduplicationKey = $"simulator-rabbitmq-{counter}"
+        };
+
+        var redisNotification = new
+        {
+            source = "simulator-redis",
+            type = eventType,
+            message = $"Redis notification #{counter} - {eventType}",
+            occurredAt,
+            deduplicationKey = $"simulator-redis-{counter}"
         };
 
         await SendWebhookMessageAsync(
@@ -160,6 +209,20 @@ static async Task ProduceMessagesAsync(
             webSocketNotification,
             counter,
             cancellationToken
+        );
+
+        await PublishRabbitMqMessageAsync(
+            rabbitMqUri,
+            rabbitMqQueue,
+            rabbitMqNotification,
+            counter
+        );
+
+        await PublishRedisMessageAsync(
+            redisConnectionString,
+            redisChannel,
+            redisNotification,
+            counter
         );
 
         counter++;
@@ -261,5 +324,80 @@ static async Task BroadcastWebSocketMessageAsync(
 
             connectedWebSocketClients.TryRemove(client.Key, out _);
         }
+    }
+}
+
+static Task PublishRabbitMqMessageAsync(
+    string rabbitMqUri,
+    string queueName,
+    object notification,
+    int counter
+)
+{
+    try
+    {
+        var factory = new ConnectionFactory
+        {
+            Uri = new Uri(rabbitMqUri)
+        };
+
+        using var connection = factory.CreateConnection();
+        using var channel = connection.CreateModel();
+
+        channel.QueueDeclare(
+            queue: queueName,
+            durable: false,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null
+        );
+
+        var payload = JsonSerializer.Serialize(notification);
+        var body = Encoding.UTF8.GetBytes(payload);
+
+        channel.BasicPublish(
+            exchange: string.Empty,
+            routingKey: queueName,
+            basicProperties: null,
+            body: body
+        );
+
+        Console.WriteLine($"RabbitMQ notification published: #{counter}");
+    }
+    catch (Exception exception)
+    {
+        Console.WriteLine($"RabbitMQ notification error #{counter}: {exception.Message}");
+    }
+
+    return Task.CompletedTask;
+}
+
+static async Task PublishRedisMessageAsync(
+    string redisConnectionString,
+    string channelName,
+    object notification,
+    int counter
+)
+{
+    try
+    {
+        var connection = await ConnectionMultiplexer.ConnectAsync(redisConnectionString);
+        var subscriber = connection.GetSubscriber();
+
+        var payload = JsonSerializer.Serialize(notification);
+
+        await subscriber.PublishAsync(
+            RedisChannel.Literal(channelName),
+            payload
+        );
+
+        await connection.CloseAsync();
+        await connection.DisposeAsync();
+
+        Console.WriteLine($"Redis notification published: #{counter}");
+    }
+    catch (Exception exception)
+    {
+        Console.WriteLine($"Redis notification error #{counter}: {exception.Message}");
     }
 }
