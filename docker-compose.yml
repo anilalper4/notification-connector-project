@@ -1,4 +1,27 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: notification-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: notification-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -16,13 +39,22 @@ services:
     ports:
       - "8090:8090"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - PORT=8090
       - BACKEND_URL=http://backend:8080
-      - CONNECTOR_SOURCES=webhook,websocket
+      - CONNECTOR_SOURCES=webhook,websocket,rabbitmq,redis
       - WEBSOCKET_SOURCE_URL=ws://simulator:7001/ws
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+      - RABBITMQ_QUEUE=notifications.rabbitmq
+      - REDIS_CONNECTION_STRING=redis:6379
+      - REDIS_CHANNEL=notifications.redis
 
   simulator:
     build:
@@ -31,11 +63,20 @@ services:
     ports:
       - "7001:7001"
     depends_on:
-      - connector
+      connector:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - PORT=7001
       - CONNECTOR_WEBHOOK_URL=http://connector:8090/webhook
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+      - RABBITMQ_QUEUE=notifications.rabbitmq
+      - REDIS_CONNECTION_STRING=redis:6379
+      - REDIS_CHANNEL=notifications.redis
 
   frontend:
     build:
