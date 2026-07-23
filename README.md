@@ -53,3 +53,67 @@ Backend
         ↓
 Frontend
 ```
+
+## 3. Hafta Kapsamı
+
+Üçüncü hafta kapsamında RabbitMQ ve Redis kaynakları sisteme dahil edilmiştir.
+
+Bu hafta yapılanlar:
+
+- RabbitMQ adapter geliştirildi.
+- Redis adapter geliştirildi.
+- Connector tarafında RabbitMQ ve Redis kaynaklarının `Register` / `Unregister` mantığıyla bağlanması sağlandı.
+- Simulator, RabbitMQ kuyruğuna mesaj basacak şekilde güncellendi.
+- Simulator, Redis channel üzerinden mesaj yayınlayacak şekilde güncellendi.
+- Docker Compose dosyasına RabbitMQ container'ı eklendi.
+- Docker Compose dosyasına Redis container'ı eklendi.
+- Connector kaynak seçimi environment variable üzerinden yönetilecek şekilde güncellendi.
+- Sistem dört farklı kaynakla uçtan uca çalışacak hale getirildi.
+
+3. hafta sonunda çalışan akış:
+
+```txt
+Simulator Webhook Sender
+        ↓
+Connector Webhook Adapter
+        ↓
+Connector Core
+        ↓
+Backend
+        ↓
+Frontend
+
+Simulator WebSocket Server
+        ↓
+Connector WebSocket Adapter
+        ↓
+Connector Core
+        ↓
+Backend
+        ↓
+Frontend
+
+Simulator RabbitMQ Publisher
+        ↓
+RabbitMQ Queue
+        ↓
+Connector RabbitMQ Adapter
+        ↓
+Connector Core
+        ↓
+Backend
+        ↓
+Frontend
+
+Simulator Redis Publisher
+        ↓
+Redis Pub/Sub Channel
+        ↓
+Connector Redis Adapter
+        ↓
+Connector Core
+        ↓
+Backend
+        ↓
+Frontend
+```
