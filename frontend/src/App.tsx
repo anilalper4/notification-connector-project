@@ -56,12 +56,12 @@ function App() {
     <main className="page">
       <section className="hero">
         <div>
-          <p className="eyebrow">2. Hafta Connector Akışı</p>
+          <p className="eyebrow">3. Hafta Çoklu Kaynak Akışı</p>
           <h1>Canlı Bildirim Listesi</h1>
           <p className="description">
-            Simulator tarafından Webhook ve WebSocket kaynaklarından üretilen
-            mesajlar connector üzerinden normalize edilir, backend'e gönderilir
-            ve bu ekranda listelenir.
+            Simulator tarafından Webhook, WebSocket, RabbitMQ ve Redis
+            kaynaklarından üretilen mesajlar connector üzerinden normalize
+            edilir, backend'e gönderilir ve bu ekranda listelenir.
           </p>
         </div>
 
