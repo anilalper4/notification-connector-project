@@ -38,7 +38,10 @@ public class RabbitMqSourceAdapter : ISourceAdapter
         var factory = new ConnectionFactory
         {
             Uri = new Uri(_rabbitMqUri),
-            DispatchConsumersAsync = true
+            DispatchConsumersAsync = true,
+            AutomaticRecoveryEnabled = true,
+            TopologyRecoveryEnabled = true,
+            NetworkRecoveryInterval = TimeSpan.FromSeconds(5)
         };
 
         _connection = factory.CreateConnection();

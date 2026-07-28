@@ -34,9 +34,12 @@ public class RedisSourceAdapter : ISourceAdapter
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        _connection = await ConnectionMultiplexer.ConnectAsync(
-            _redisConnectionString
-        );
+        var options = ConfigurationOptions.Parse(_redisConnectionString);
+        options.AbortOnConnectFail = false;
+        options.ConnectRetry = 5;
+        options.ReconnectRetryPolicy = new ExponentialRetry(3000);
+
+        _connection = await ConnectionMultiplexer.ConnectAsync(options);
 
         _subscriber = _connection.GetSubscriber();
 
