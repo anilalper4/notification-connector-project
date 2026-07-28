@@ -7,11 +7,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<NotificationNormalizer>();
 builder.Services.AddSingleton<IConnector, NotificationConnector>();
+builder.Services.AddSingleton<NotificationOutbox>();
 
 builder.Services.AddSingleton<WebhookSourceAdapter>();
 builder.Services.AddSingleton<WebSocketSourceAdapter>();
 builder.Services.AddSingleton<RabbitMqSourceAdapter>();
 builder.Services.AddSingleton<RedisSourceAdapter>();
+
 builder.Services.AddHttpClient<BackendNotificationClient>(client =>
 {
     var backendUrl = builder.Configuration["BACKEND_URL"]
@@ -21,6 +23,7 @@ builder.Services.AddHttpClient<BackendNotificationClient>(client =>
 });
 
 builder.Services.AddHostedService<ConnectorHostedService>();
+builder.Services.AddHostedService<BackendDeliveryWorker>();
 
 var app = builder.Build();
 

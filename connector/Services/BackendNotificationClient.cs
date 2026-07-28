@@ -17,7 +17,7 @@ public class BackendNotificationClient
         _logger = logger;
     }
 
-    public async Task SendAsync(
+    public async Task<bool> TrySendAsync(
         NotificationEnvelope notification,
         CancellationToken cancellationToken
     )
@@ -39,21 +39,30 @@ public class BackendNotificationClient
                     notification.DeduplicationKey
                 );
 
-                return;
+                return true;
             }
 
             _logger.LogWarning(
-                "Backend returned non-success status code: {StatusCode}",
-                response.StatusCode
+                "Backend returned non-success status code: {StatusCode}. DeduplicationKey: {DeduplicationKey}",
+                response.StatusCode,
+                notification.DeduplicationKey
             );
+
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            _logger.LogError(
+            _logger.LogWarning(
                 exception,
-                "Failed to send notification to backend. DeduplicationKey: {DeduplicationKey}",
+                "Backend is not reachable. Notification will be retried. DeduplicationKey: {DeduplicationKey}",
                 notification.DeduplicationKey
             );
+
+            return false;
         }
     }
 }

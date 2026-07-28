@@ -10,7 +10,7 @@ public class ConnectorHostedService : BackgroundService
     private readonly WebSocketSourceAdapter _webSocketSourceAdapter;
     private readonly RabbitMqSourceAdapter _rabbitMqSourceAdapter;
     private readonly RedisSourceAdapter _redisSourceAdapter;
-    private readonly BackendNotificationClient _backendNotificationClient;
+    private readonly NotificationOutbox _outbox;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ConnectorHostedService> _logger;
 
@@ -20,7 +20,7 @@ public class ConnectorHostedService : BackgroundService
         WebSocketSourceAdapter webSocketSourceAdapter,
         RabbitMqSourceAdapter rabbitMqSourceAdapter,
         RedisSourceAdapter redisSourceAdapter,
-        BackendNotificationClient backendNotificationClient,
+        NotificationOutbox outbox,
         IConfiguration configuration,
         ILogger<ConnectorHostedService> logger
     )
@@ -30,7 +30,7 @@ public class ConnectorHostedService : BackgroundService
         _webSocketSourceAdapter = webSocketSourceAdapter;
         _rabbitMqSourceAdapter = rabbitMqSourceAdapter;
         _redisSourceAdapter = redisSourceAdapter;
-        _backendNotificationClient = backendNotificationClient;
+        _outbox = outbox;
         _configuration = configuration;
         _logger = logger;
     }
@@ -39,9 +39,18 @@ public class ConnectorHostedService : BackgroundService
     {
         var enabledSources = GetEnabledSources();
 
-        _connector.OnMessage += async notification =>
+        _connector.OnMessage += notification =>
         {
-            await _backendNotificationClient.SendAsync(notification, stoppingToken);
+            _outbox.Enqueue(notification);
+
+            _logger.LogInformation(
+                "Notification added to outbox. Source: {Source}, Type: {Type}, PendingCount: {PendingCount}",
+                notification.Source,
+                notification.Type,
+                _outbox.Count
+            );
+
+            return Task.CompletedTask;
         };
 
         if (enabledSources.Contains("webhook"))
