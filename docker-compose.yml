@@ -55,6 +55,9 @@ services:
       - RABBITMQ_QUEUE=notifications.rabbitmq
       - REDIS_CONNECTION_STRING=redis:6379
       - REDIS_CHANNEL=notifications.redis
+      - BACKEND_RETRY_DELAY_SECONDS=3
+      - SHUTDOWN_FLUSH_SECONDS=10
+    stop_grace_period: 15s
 
   simulator:
     build:
